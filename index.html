@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>하단 띠 보드 카메라 테스트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#EEF0F3; --surface:#FFFFFF; --ink:#1C2230; --muted:#5F6675;
+  --line:#C9CED8; --slate:#3F4452; --accent:#2E6FD8; --err:#B3261E;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181E; --surface:#1F232B; --ink:#E8EBF0; --muted:#9AA1AE;
+    --line:#363C48; --slate:#2A2F3A; --accent:#6EA0F0; --err:#F2887F;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15181E; --surface:#1F232B; --ink:#E8EBF0; --muted:#9AA1AE;
+  --line:#363C48; --slate:#2A2F3A; --accent:#6EA0F0; --err:#F2887F;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  font-size:16px; line-height:1.5;
+}
+main{max-width:560px; margin:0 auto; padding:16px 14px 40px}
+h1{font-size:1.3rem; margin:2px 0 12px; letter-spacing:-0.01em}
+details.card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 14px}
+details.card summary{cursor:pointer; font-weight:600; padding:2px 0}
+details.card summary span{font-weight:400; color:var(--muted); font-size:.85rem; margin-left:6px}
+.fields{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px}
+.fields .wide{grid-column:1 / -1}
+label.f{display:block; font-size:.8rem; color:var(--muted); margin-bottom:3px}
+input[type=text]{
+  width:100%; font:inherit; font-size:1rem; color:var(--ink); background:transparent;
+  border:1px solid var(--line); border-radius:6px; padding:9px 10px;
+}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+.viewfinder{
+  position:relative; margin-top:12px; background:#000; border-radius:10px; overflow:hidden;
+  width:100%; aspect-ratio:3/4; margin-left:auto; margin-right:auto;
+}
+.viewfinder video,.viewfinder canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+.viewfinder video{object-fit:cover}
+.vf-msg{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:12px; color:#D5D9E0; text-align:center; padding:20px; font-size:.95rem;
+}
+.shutter-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:14px 0 6px}
+.shutter{
+  width:72px; height:72px; border-radius:50%; border:4px solid var(--slate); background:var(--surface);
+  padding:0; cursor:pointer; flex:none; position:relative;
+}
+.shutter::after{content:""; position:absolute; inset:6px; border-radius:50%; background:var(--slate)}
+.shutter:active::after{inset:9px}
+.shutter:disabled{opacity:.35; cursor:default}
+.side{flex:1; display:flex}
+.side.right{justify-content:flex-end}
+
+.btn{
+  position:relative; overflow:hidden; display:inline-flex; align-items:center; justify-content:center;
+  font:inherit; font-weight:600; font-size:.92rem; border-radius:8px; padding:10px 12px; cursor:pointer; margin:0;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+}
+.btn.primary{background:var(--slate); color:#fff; border-color:var(--slate)}
+.btn input{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer}
+.btn:focus-within{outline:2px solid var(--accent); outline-offset:2px}
+.hidden{display:none !important}
+
+.result{margin-top:14px}
+.frame{background:var(--slate); border-radius:8px; overflow:hidden}
+.frame img{display:block; width:100%; max-width:100%; height:auto}
+.frame .cap{color:#fff; font-weight:700; padding:6px 10px; font-size:.95rem}
+.row{display:flex; gap:10px; margin-top:10px}
+.row .btn{flex:1}
+.status{font-size:.88rem; color:var(--muted); min-height:1.4em; margin-top:8px}
+.status.err{color:var(--err)}
+</style>
+</head>
+<body>
+<main>
+  <h1>하단 띠 보드 카메라</h1>
+
+  <details class="card" id="info">
+    <summary>보드 정보 <span id="summary-line"></span></summary>
+    <div class="fields">
+      <div><label class="f" for="f-title">제목</label><input type="text" id="f-title" value="굴업도"></div>
+      <div><label class="f" for="f-cat">분류</label><input type="text" id="f-cat" value="일상취미"></div>
+      <div class="wide"><label class="f" for="f-desc">내용</label><input type="text" id="f-desc" value="달리자모임백패킹"></div>
+      <div><label class="f" for="f-date">일자</label><input type="text" id="f-date" inputmode="numeric"></div>
+      <div><label class="f" for="f-loc">위치</label><input type="text" id="f-loc" value="개머리언덕"></div>
+    </div>
+  </details>
+
+  <div class="viewfinder" id="vf">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+    <div class="vf-msg" id="vf-msg">
+      <div id="vf-text">카메라를 켜면 보드가 화면 아래에 겹쳐 보여요.</div>
+      <button class="btn primary" id="btn-cam">카메라 켜기</button>
+    </div>
+  </div>
+
+  <div class="shutter-row">
+    <div class="side">
+      <label class="btn">앨범
+        <input type="file" id="in-pick" accept="image/*" aria-label="앨범에서 사진 고르기">
+      </label>
+    </div>
+    <button class="shutter" id="shutter" aria-label="촬영" disabled></button>
+    <div class="side right">
+      <label class="btn" id="native-cam">기본 카메라
+        <input type="file" id="in-shoot" accept="image/*" capture="environment" aria-label="기본 카메라로 찍기">
+      </label>
+    </div>
+  </div>
+  <div class="status" id="status"></div>
+
+  <section class="result hidden" id="result" aria-live="polite">
+    <div class="frame">
+      <img id="out" alt="정보 띠가 합성된 사진">
+      <div class="cap" id="cap"></div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="btn-save">사진 저장</button>
+      <button class="btn" id="btn-redraw">정보 수정 반영</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const F = ["f-title","f-desc","f-date","f-cat","f-loc"];
+  const FONT = '"IBM Plex Sans KR","Apple SD Gothic Neo",sans-serif';
+
+  const d = new Date();
+  $("f-date").value = d.getFullYear()+"."+String(d.getMonth()+1).padStart(2,"0")+"."+String(d.getDate()).padStart(2,"0");
+  try{
+    const saved = JSON.parse(localStorage.getItem("board-fields") || "null");
+    if(saved) F.forEach(k => { if(k !== "f-date" && saved[k] != null) $(k).value = saved[k]; });
+  }catch(e){}
+
+  function values(){
+    return [
+      {t:$("f-title").value.trim(), b:true},
+      {t:$("f-desc").value.trim()},
+      {t:$("f-date").value.trim()},
+      {t:$("f-cat").value.trim()},
+      {t:$("f-loc").value.trim()}
+    ].filter(v => v.t);
+  }
+  function updateSummary(){ $("summary-line").textContent = values().map(v=>v.t).join(" / "); }
+  updateSummary();
+  F.forEach(k => $(k).addEventListener("input", () => {
+    try{ const o={}; F.forEach(x=>o[x]=$(x).value); localStorage.setItem("board-fields", JSON.stringify(o)); }catch(e){}
+    updateSummary(); drawOverlay();
+  }));
+
+  function setStatus(t, err){ const s=$("status"); s.textContent=t||""; s.classList.toggle("err",!!err); }
+
+  // 하단 띠 그리기: 사진 합성과 뷰파인더 미리보기에 같은 규칙을 씀
+  function drawBand(g, W, H, ox, oy){
+    ox = ox||0; oy = oy||0;
+    const vals = values();
+    if(!vals.length) return;
+    let fs = Math.round(Math.min(W,H) * 0.034);
+    const padX = () => Math.round(fs*0.9), gap = () => Math.round(fs*1.3);
+    const font = b => (b?"700 ":"400 ")+fs+"px "+FONT;
+    const measure = () => { let w=padX()*2; vals.forEach((v,i)=>{ g.font=font(v.b); w+=g.measureText(v.t).width; if(i) w+=gap(); }); return w; };
+    while(fs > 6 && measure() > W) fs--;
+    const bandH = Math.round(fs*2.1), y0 = oy + H - bandH, cy = y0 + bandH/2;
+    g.fillStyle = "rgba(20,24,32,0.62)";
+    g.fillRect(ox, y0, W, bandH);
+    let x = ox + padX();
+    g.textBaseline = "middle";
+    vals.forEach((v,i) => {
+      if(i){
+        g.fillStyle = "rgba(255,255,255,0.45)";
+        g.fillRect(Math.round(x+gap()/2), Math.round(cy-fs*0.5), Math.max(1,Math.round(fs*0.06)), Math.round(fs));
+        x += gap();
+      }
+      g.font = font(v.b); g.fillStyle = "#fff";
+      g.fillText(v.t, x, cy + fs*0.04);
+      x += g.measureText(v.t).width;
+    });
+  }
+
+  // ---- 라이브 카메라 ----
+  const video = $("video"), overlay = $("overlay"), vf = $("vf");
+  let stream = null;
+
+  // 화면에 보이는 영역 = 실제 찍히는 영역이 되도록 뷰파인더 비율을 영상 비율에 맞춤
+  function fitViewfinder(){
+    if(video.videoWidth) vf.style.aspectRatio = video.videoWidth + " / " + video.videoHeight;
+    drawOverlay();
+  }
+  function drawOverlay(){
+    const r = vf.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    overlay.width = Math.round(r.width*dpr); overlay.height = Math.round(r.height*dpr);
+    const g = overlay.getContext("2d");
+    g.clearRect(0,0,overlay.width,overlay.height);
+    if(stream) drawBand(g, overlay.width, overlay.height);
+  }
+  window.addEventListener("resize", drawOverlay);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(drawOverlay);
+
+  async function startCamera(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      camFail("이 화면에서는 카메라를 바로 켤 수 없어요. 파일을 크롬에서 열었는지 확인하거나, 아래 '기본 카메라'로 찍어 주세요.");
+      return;
+    }
+    $("vf-text").textContent = "카메라 켜는 중…";
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio:false,
+        video:{ facingMode:{ideal:"environment"}, width:{ideal:3840}, height:{ideal:2160} }
+      });
+    }catch(err){
+      const n = err && err.name;
+      if(n === "NotAllowedError") camFail("카메라 권한이 거부됐어요. 주소창 왼쪽 자물쇠 아이콘에서 카메라를 허용한 뒤 다시 눌러 주세요.");
+      else camFail("카메라를 켜지 못했어요. 아래 '기본 카메라'로 찍을 수 있어요.");
+      return;
+    }
+    video.srcObject = stream;
+    video.onloadedmetadata = () => { video.play(); fitViewfinder(); };
+    $("vf-msg").classList.add("hidden");
+    $("shutter").disabled = false;
+    $("info").open = false;
+    setStatus("");
+  }
+  function camFail(msg){
+    stream = null;
+    $("vf-text").textContent = msg;
+    $("btn-cam").textContent = "다시 시도";
+  }
+  $("btn-cam").onclick = startCamera;
+
+  let srcSource = null, count = 0, outBlob = null, outName = "";
+
+  $("shutter").onclick = () => {
+    if(!stream || !video.videoWidth) return;
+    const c = document.createElement("canvas");
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext("2d").drawImage(video, 0, 0);
+    srcSource = c; count++;
+    vf.animate && vf.animate([{opacity:.3},{opacity:1}], {duration:180});
+    compose();
+  };
+
+  function loadFile(file, input){
+    if(!file) return;
+    setStatus("사진을 불러오는 중…");
+    const img = new Image();
+    img.onload = () => { srcSource = img; count++; compose(); input.value=""; };
+    img.onerror = () => setStatus("사진을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.", true);
+    img.src = URL.createObjectURL(file);
+  }
+  $("in-pick").onchange = e => loadFile(e.target.files[0], e.target);
+  $("in-shoot").onchange = e => loadFile(e.target.files[0], e.target);
+  $("btn-redraw").onclick = () => { if(srcSource) compose(); };
+
+  async function compose(){
+    try{ await document.fonts.load("700 40px "+FONT); await document.fonts.load("400 40px "+FONT); }catch(e){}
+    const iw = srcSource.naturalWidth || srcSource.width, ih = srcSource.naturalHeight || srcSource.height;
+    const sc = Math.min(1, 4096 / Math.max(iw, ih));
+    const W = Math.round(iw*sc), H = Math.round(ih*sc);
+    const c = document.createElement("canvas"); c.width=W; c.height=H;
+    const g = c.getContext("2d");
+    g.drawImage(srcSource, 0, 0, W, H);
+    drawBand(g, W, H);
+    c.toBlob(b => {
+      if(!b){ setStatus("사진을 만들지 못했어요. 다시 시도해 주세요.", true); return; }
+      outBlob = b;
+      const date = $("f-date").value.replace(/[^0-9]/g,"") || "photo";
+      outName = ($("f-title").value.trim() || "사진") + "_" + date + "_" + count + ".jpg";
+      const o = $("out");
+      if(o.dataset.url) URL.revokeObjectURL(o.dataset.url);
+      o.dataset.url = URL.createObjectURL(b); o.src = o.dataset.url;
+      $("cap").textContent = "테스트 " + count;
+      $("result").classList.remove("hidden");
+      setStatus(downloads ? "" : "저장 버튼이 안 되면 사진을 길게 눌러 저장하세요.");
+    }, "image/jpeg", 0.92);
+  }
+
+  let downloads = null;
+  $("btn-save").onclick = async () => {
+    if(!outBlob) return;
+    if(!downloads){
+      // 단독 파일로 열었을 때: 일반 다운로드
+      const a = document.createElement("a");
+      a.href = $("out").src; a.download = outName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setStatus("안 받아졌다면 사진을 길게 눌러 저장하세요.");
+      return;
+    }
+    try{ await downloads.save({filename: outName, data: outBlob}); setStatus("저장했어요."); }
+    catch(err){
+      const code = err && err.code;
+      if(code === "declined") setStatus("저장을 취소했어요.");
+      else if(code === "rate_limited") setStatus("잠시 후 다시 눌러 주세요.");
+      else setStatus("여기서는 저장 버튼을 쓸 수 없어요. 사진을 길게 눌러 저장하세요.");
+    }
+  };
+  if(window.claude && typeof window.claude.use === "function"){
+    window.claude.use("downloads").then(ns => { downloads = ns; }).catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
